@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 import java.util.List;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
 
 /// Uma aplicação desktop (usando a biblioteca [OpenJFX (JavaFX)](http://openjfx.io))
@@ -82,16 +83,8 @@ public class PoligonosApp extends Application {
         final var root = new Pane();
         final var scene = new Scene(root, 800, 600);
 
-        for (final var listaPontos : pontosPoligonos) {
-            final var poligono = new Polygon();
-            for (final Point point : listaPontos) {
-                poligono.getPoints().addAll(point.x(), point.y());
-            }
-
-            poligono.setFill(Color.BLUE);
-            poligono.setStroke(Color.BLACK);
-            root.getChildren().add(poligono);
-        }
+        final List<Polygon> poligonos = pontosPoligonos.stream().map(PoligonosApp::newPoligono).toList();
+        root.getChildren().addAll(poligonos);
 
         final List<String> perimetros = perimetros().stream().map(p -> String.format("%.1f", p)).toList();
         final var label1 = newLabel("Perímetro dos Polígonos: " + perimetros, 500);
@@ -102,6 +95,22 @@ public class PoligonosApp extends Application {
         mainStage.setScene(scene);
         mainStage.setAlwaysOnTop(true);
         mainStage.show();
+    }
+
+    /// Cria um [Polygon] a partir de uma lista de pontos.
+    /// Cada [Point] é "achatado" (flatMap) nas suas coordenadas x e y,
+    /// gerando o array `[x1, y1, x2, y2, ...]` esperado pelo construtor de [Polygon].
+    ///
+    /// @param pontos lista de pontos que formam o polígono
+    /// @return o polígono criado
+    private static Polygon newPoligono(final List<Point> pontos) {
+        final double[] coordenadas = pontos.stream()
+                                           .flatMapToDouble(p -> DoubleStream.of(p.x(), p.y()))
+                                           .toArray();
+        final var poligono = new Polygon(coordenadas);
+        poligono.setFill(Color.BLUE);
+        poligono.setStroke(Color.BLACK);
+        return poligono;
     }
 
     private static Label newLabel(final String title, final int y) {
@@ -126,8 +135,16 @@ public class PoligonosApp extends Application {
     /// @return uma lista de String indicando se o polígono é um "quadrilátero" (quadrado ou retângulo),
     /// "triângulo", "pentágono", "hexágono" ou apenas um "polígono" geral quando tiver mais de 6 lados.
     protected List<String> tipoPoligonos(){
-        // TODO Apague esta linha e a próxima e implemente seu código
-        return List.of();
+        return pontosPoligonos.stream()
+                              .flatMap(pontos -> Stream.of(pontos.size()))
+                              .map(totalPontos -> switch (totalPontos) {
+                                  case 3 -> "Triângulo";
+                                  case 4 -> "Quadrilátero";
+                                  case 5 -> "Pentágono";
+                                  case 6 -> "Hexágono";
+                                  default -> "Polígono";
+                              })
+                              .toList();
     }
 
     /// Calcula o perímetro de cada polígono.
@@ -167,8 +184,11 @@ public class PoligonosApp extends Application {
     ///
     /// @return uma lista contendo o perímetro de cada polígono
     protected List<Double> perimetros(){
-        // TODO Apague esta linha e a próxima e implemente seu código
-        return List.of();
+        return pontosPoligonos.stream()
+                              // Começa pelo último ponto (com distância 0) para fechar o polígono: C → A, A → B, B → C
+                              .flatMap(pontos -> Stream.of(pontos.stream().reduce(pontos.getLast(), Point::new)))
+                              .map(Point::distance)
+                              .toList();
     }
 }
 
